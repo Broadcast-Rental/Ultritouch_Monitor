@@ -98,11 +98,30 @@ pytest tests/
 
 Deploy on a Linux host that can reach `172.21.x` (management VLAN). Docker Desktop on Windows often cannot reach those subnets even with `network_mode: host`; Portainer on the rack network works.
 
-1. Clone or deploy stack from [Broadcast-Rental/Ultritouch_Monitor](https://github.com/Broadcast-Rental/Ultritouch_Monitor).
-2. On the server, create `config.yaml` from `config.example.yaml` and run Arista discovery (see Quick start).
-3. In Portainer: **Stacks** → **Add stack** → paste [docker-compose.yml](docker-compose.yml) or point at the repo.
-4. Ensure bind mounts exist: `./config.yaml` and `./data` on the host next to the compose file.
-5. Open `http://<server-ip>:8080/` on the kiosk PC.
+### Stack in Portainer (avoids “Dockerfile: no such file”)
+
+The default [docker-compose.yml](docker-compose.yml) **pulls a pre-built image** — it does not run `docker build` on the server. That fixes Portainer’s common error when only the compose file is deployed (Web editor or raw GitHub URL).
+
+1. On the Portainer host, create a folder (e.g. `/opt/ultritouch`) with:
+   - `config.yaml` (from `config.example.yaml`, after Arista discovery)
+   - empty `data/` directory
+2. **Stacks** → **Add stack** → **Web editor** or **Repository**:
+   - Paste or use repo `https://github.com/Broadcast-Rental/Ultritouch_Monitor`
+   - Compose path: `docker-compose.yml`
+3. If using **Repository**, set **Stack path** / working directory to the folder that contains `config.yaml` and `data/` (bind mounts use `./config.yaml` and `./data`).
+4. Deploy. Image: `ghcr.io/broadcast-rental/ultritouch-monitor:latest` (built on each push to `main` via GitHub Actions).
+5. If pull is denied, open the package on GitHub → **Package settings** → **Change visibility** → Public, or add a Portainer registry credential for `ghcr.io`.
+6. Open `http://<server-ip>:8080/` on the kiosk PC.
+
+Do **not** use a raw `raw.githubusercontent.com/.../docker-compose.yml` URL as the only source if the file still contains `build: .` — Portainer never receives the Dockerfile.
+
+### Build on the server instead
+
+Clone the repo on the host, add `config.yaml`, then:
+
+```bash
+docker compose -f docker-compose.build.yml up --build -d
+```
 
 `network_mode: host` is required so SNMP and Ember+ use the host routing table (not NAT). The UI listens on port **8080** on the host.
 

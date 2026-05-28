@@ -1,9 +1,11 @@
-# Portainer / production: pulls a pre-built image (no Dockerfile in the stack folder).
-# To build on the host from a git clone, use docker-compose.build.yml instead.
+# Local / full-repo build (requires Dockerfile in the same directory).
+#   docker compose -f docker-compose.build.yml up --build
 services:
   ultritouch-monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: ghcr.io/broadcast-rental/ultritouch-monitor:latest
-    pull_policy: always
     network_mode: host
     volumes:
       - ./config.yaml:/app/config.yaml:ro
@@ -13,4 +15,3 @@ services:
       - CONFIG_PATH=/app/config.yaml
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     restart: unless-stopped
-    # With host network, the kiosk is at http://localhost:8080/ (no ports: mapping)
