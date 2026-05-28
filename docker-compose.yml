@@ -2,10 +2,12 @@
 # After editing config.yaml on GitHub: Pull and redeploy to rebuild.
 services:
   ultritouch-monitor:
+    container_name: ultritouch-monitor
     build:
       context: https://github.com/Broadcast-Rental/Ultritouch_Monitor.git#main
       dockerfile: Dockerfile
     network_mode: host
+    stop_grace_period: 15s
     volumes:
       - ultritouch-data:/app/data
     environment:

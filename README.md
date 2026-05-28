@@ -80,8 +80,14 @@ python -m uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8080   # termi
 pytest tests/
 ```
 
+## Troubleshooting
+
+**`address already in use` on port 8080** — With `network_mode: host`, only one process on the server can use that port. Stop duplicate stacks in Portainer, or run `docker stop ultritouch-monitor` and remove old containers. Or change `api.port` in `config.yaml` (e.g. `8088`) and open `http://<server>:8088/`.
+
+**Ember `No device matching … under 997`** — Check logs for `Children found:` and set `ember.sr2_name_match` in `config.yaml` to a substring of the real device name.
+
 ## Notes
 
-- `network_mode: host` — container uses the host network (needed for `172.21.x`). UI on port **8080**.
+- `network_mode: host` — container uses the host network (needed for `172.21.x`). UI on port **8080** (see `api.port` in config).
 - Docker Desktop on Windows often cannot reach `172.21.x`; run on the Portainer host on the rack network.
 - Aruba: uplink ifIndex **26** (link/errors only). Arista: DOM via discovery.

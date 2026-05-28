@@ -27,7 +27,8 @@ ember:
     - 172.21.50.21
     - 172.21.50.22
   port: 9000
-  sr2_name_match: "SR2"
+  # Substring match on device name under fiber_root (997). Logs list candidates if no match.
+  sr2_name_match: "Stageracer"
   fiber_root: "997"
   state_file: data/ember_state.json
 

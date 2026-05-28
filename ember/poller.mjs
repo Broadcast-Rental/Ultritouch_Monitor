@@ -88,22 +88,40 @@ async function readParameter(client, paramPath) {
   }
 }
 
+async function nodeLabel(client, root, i) {
+  try {
+    const node = await client.getElementByPathAsync(`${root}/${i}`);
+    if (!node) return null;
+    const c = node.contents || node;
+    const parts = [c.identifier, c.description, c.displayName, c.name, node.identifier, node.description]
+      .filter((x) => x != null && String(x).trim() !== "")
+      .map(String);
+    if (parts.length) return [...new Set(parts)].join(" ");
+    const param = await readParameter(client, `${root}/${i}`);
+    return param != null ? String(param) : null;
+  } catch {
+    return null;
+  }
+}
+
 async function discoverSrIndex(client, root, nameMatch) {
+  const candidates = [];
   for (let i = 1; i <= 20; i++) {
-    const namePath = emberPath(root, i, "");
-    try {
-      const node = await client.getElementByPathAsync(`${root}/${i}`);
-      if (!node) continue;
-      const name =
-        (await readParameter(client, `${root}/${i}`)) ??
-        node.contents?.description ??
-        node.description;
-      if (name && String(name).toUpperCase().includes(nameMatch.toUpperCase())) {
-        return i;
-      }
-    } catch {
-      /* try next */
+    const label = await nodeLabel(client, root, i);
+    if (!label) continue;
+    candidates.push({ i, label });
+    if (label.toUpperCase().includes(nameMatch.toUpperCase())) {
+      return i;
     }
+  }
+  if (candidates.length) {
+    log(
+      "WARN",
+      `No device matching "${nameMatch}" under ${root}. Children found: ` +
+        candidates.map((c) => `${c.i}="${c.label}"`).join(", ")
+    );
+  } else {
+    log("WARN", `No children under Ember path ${root} (expected e.g. ${root}/1, ${root}/2, …)`);
   }
   return null;
 }
