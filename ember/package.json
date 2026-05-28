@@ -1,0 +1,10 @@
+{
+  "name": "ultritouch-ember-poller",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "node-emberplus": "^3.0.8",
+    "yaml": "^2.6.1"
+  }
+}

@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+config.yaml
+data/
+ember/node_modules/
+ember/package-lock.json
+*.egg-info/
+.pytest_cache/
+.DS_Store

@@ -1,0 +1,13 @@
+services:
+  ultritouch-monitor:
+    build: .
+    network_mode: host
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./data:/app/data
+    environment:
+      - SNMP_COMMUNITY=${SNMP_COMMUNITY:-public}
+      - CONFIG_PATH=/app/config.yaml
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    restart: unless-stopped
+    # With host network, the kiosk is at http://localhost:8080/ (no ports: mapping)
