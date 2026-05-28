@@ -1,15 +1,13 @@
-# Local / full-repo build (requires Dockerfile in the same directory).
-#   docker compose -f docker-compose.build.yml up --build
+# Alias for docker-compose.yml (build on host).
 services:
   ultritouch-monitor:
     build:
       context: .
       dockerfile: Dockerfile
-    image: ghcr.io/broadcast-rental/ultritouch-monitor:latest
     network_mode: host
     volumes:
-      - ./config.yaml:/app/config.yaml:ro
-      - ./data:/app/data
+      - ${ULTRITOUCH_CONFIG:-./config.yaml}:/app/config.yaml:ro
+      - ${ULTRITOUCH_DATA:-./data}:/app/data
     environment:
       - SNMP_COMMUNITY=${SNMP_COMMUNITY:-public}
       - CONFIG_PATH=/app/config.yaml

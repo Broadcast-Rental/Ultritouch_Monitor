@@ -1,10 +1,9 @@
-# Portainer: deploy via Git "Repository" (full clone). Do not use Web editor only.
-# Set ULTRITOUCH_CONFIG / ULTRITOUCH_DATA to host paths where config.yaml lives.
+# Optional: pull pre-built image (package must be public or registry login in Portainer).
+#   docker compose -f docker-compose.ghcr.yml up -d
 services:
   ultritouch-monitor:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/broadcast-rental/ultritouch-monitor:latest
+    pull_policy: always
     network_mode: host
     volumes:
       - ${ULTRITOUCH_CONFIG:-./config.yaml}:/app/config.yaml:ro
@@ -14,4 +13,3 @@ services:
       - CONFIG_PATH=/app/config.yaml
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     restart: unless-stopped
-    # Kiosk: http://<host>:8080/

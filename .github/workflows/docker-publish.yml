@@ -28,3 +28,15 @@ jobs:
           tags: |
             ghcr.io/broadcast-rental/ultritouch-monitor:latest
             ghcr.io/broadcast-rental/ultritouch-monitor:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.repositoryUrl }}
+
+      - name: Set GHCR package visibility to public
+        continue-on-error: true
+        run: |
+          gh api --method PUT \
+            -H "Accept: application/vnd.github+json" \
+            "/orgs/${{ github.repository_owner }}/packages/container/ultritouch-monitor/visibility" \
+            -f visibility='public'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

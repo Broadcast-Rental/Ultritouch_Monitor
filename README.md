@@ -98,29 +98,34 @@ pytest tests/
 
 Deploy on a Linux host that can reach `172.21.x` (management VLAN). Docker Desktop on Windows often cannot reach those subnets even with `network_mode: host`; Portainer on the rack network works.
 
-### Stack in Portainer (avoids “Dockerfile: no such file”)
+### Stack in Portainer
 
-The default [docker-compose.yml](docker-compose.yml) **pulls a pre-built image** — it does not run `docker build` on the server. That fixes Portainer’s common error when only the compose file is deployed (Web editor or raw GitHub URL).
+Use **Repository** (not Web editor alone). Portainer must clone the full repo so `docker build` can see the `Dockerfile`.
 
-1. On the Portainer host, create a folder (e.g. `/opt/ultritouch`) with:
+1. On the Portainer host, create e.g. `/opt/ultritouch/` with:
    - `config.yaml` (from `config.example.yaml`, after Arista discovery)
    - empty `data/` directory
-2. **Stacks** → **Add stack** → **Web editor** or **Repository**:
-   - Paste or use repo `https://github.com/Broadcast-Rental/Ultritouch_Monitor`
+2. **Stacks** → **Add stack** → **Repository**:
+   - URL: `https://github.com/Broadcast-Rental/Ultritouch_Monitor`
+   - Branch: `main`
    - Compose path: `docker-compose.yml`
-3. If using **Repository**, set **Stack path** / working directory to the folder that contains `config.yaml` and `data/` (bind mounts use `./config.yaml` and `./data`).
-4. Deploy. Image: `ghcr.io/broadcast-rental/ultritouch-monitor:latest` (built on each push to `main` via GitHub Actions).
-5. If pull is denied, open the package on GitHub → **Package settings** → **Change visibility** → Public, or add a Portainer registry credential for `ghcr.io`.
-6. Open `http://<server-ip>:8080/` on the kiosk PC.
+3. In the stack **Environment variables**, set (paths on the Docker host):
+   - `ULTRITOUCH_CONFIG=/opt/ultritouch/config.yaml`
+   - `ULTRITOUCH_DATA=/opt/ultritouch/data`
+4. Deploy (first deploy builds the image on the server; may take a few minutes).
+5. Open `http://<server-ip>:8080/` on the kiosk PC.
 
-Do **not** use a raw `raw.githubusercontent.com/.../docker-compose.yml` URL as the only source if the file still contains `build: .` — Portainer never receives the Dockerfile.
+**GHCR pull (`unauthorized`)** — the default compose no longer pulls from `ghcr.io`. To use the pre-built image instead, either make the package public (GitHub → **Packages** → `ultritouch-monitor` → **Package settings** → **Public**) and use [docker-compose.ghcr.yml](docker-compose.ghcr.yml), or add a Portainer registry for `ghcr.io` with a GitHub PAT (`read:packages`).
 
-### Build on the server instead
+Do **not** deploy from a raw `raw.githubusercontent.com/.../docker-compose.yml` URL only — that omits the `Dockerfile`.
 
-Clone the repo on the host, add `config.yaml`, then:
+### Build on the server (SSH)
 
 ```bash
-docker compose -f docker-compose.build.yml up --build -d
+git clone https://github.com/Broadcast-Rental/Ultritouch_Monitor.git
+cd Ultritouch_Monitor
+cp config.example.yaml config.yaml   # edit + Arista discovery
+docker compose up --build -d
 ```
 
 `network_mode: host` is required so SNMP and Ember+ use the host routing table (not NAT). The UI listens on port **8080** on the host.
