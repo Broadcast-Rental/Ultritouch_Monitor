@@ -28,8 +28,20 @@ function loadConfig() {
   return yaml.parse(fs.readFileSync(configPath, "utf8"));
 }
 
+/** Stageracer paths use Ember numbers: 997.{srIndex}.{param} e.g. 997.1.2100 */
 function emberPath(root, srIndex, suffix) {
-  return `${root}/${srIndex}/${suffix}`;
+  return `${root}.${srIndex}.${suffix}`;
+}
+
+function pathVariants(root, srIndex, suffix) {
+  const r = String(root);
+  const i = String(srIndex);
+  const s = String(suffix);
+  return [
+    `${r}.${i}.${s}`,
+    `${r}/${i}/${s}`,
+    `0.${r}.${i}.${s}`,
+  ];
 }
 
 function tcpProbe(host, port, timeoutMs = 3000) {
@@ -75,33 +87,97 @@ function trunkStatus(sync, powerDbm, lastErrorSec, thresholds) {
   return { status: "green", summary: "OK" };
 }
 
+function labelFromNode(node) {
+  if (!node) return null;
+  const c = node.contents || node;
+  const parts = [c.identifier, c.description, c.displayName, c.name, node.identifier, node.description]
+    .filter((x) => x != null && String(x).trim() !== "")
+    .map(String);
+  return parts.length ? [...new Set(parts)].join(" ") : null;
+}
+
 async function readParameter(client, paramPath) {
+  const paths = Array.isArray(paramPath) ? paramPath : [paramPath];
+  for (const p of paths) {
+    try {
+      const node = await client.getElementByPathAsync(p);
+      if (!node) continue;
+      const v = node.contents?.value ?? node.value;
+      if (v == null) continue;
+      if (typeof v === "object" && "value" in v) return v.value;
+      return v;
+    } catch {
+      /* try next path form */
+    }
+  }
+  return null;
+}
+
+async function getNode(client, pathStr) {
   try {
-    const node = await client.getElementByPathAsync(paramPath);
-    if (!node) return null;
-    const v = node.contents?.value ?? node.value;
-    if (v == null) return null;
-    if (typeof v === "object" && "value" in v) return v.value;
-    return v;
+    return await client.getElementByPathAsync(pathStr);
   } catch {
     return null;
   }
 }
 
-async function nodeLabel(client, root, i) {
-  try {
-    const node = await client.getElementByPathAsync(`${root}/${i}`);
-    if (!node) return null;
-    const c = node.contents || node;
-    const parts = [c.identifier, c.description, c.displayName, c.name, node.identifier, node.description]
-      .filter((x) => x != null && String(x).trim() !== "")
-      .map(String);
-    if (parts.length) return [...new Set(parts)].join(" ");
-    const param = await readParameter(client, `${root}/${i}`);
-    return param != null ? String(param) : null;
-  } catch {
-    return null;
+async function expandFiberRoot(client, root) {
+  const tries = [String(root), `0.${root}`, root.replace(/\//g, ".")];
+  for (const p of tries) {
+    const node = await getNode(client, p);
+    if (!node) continue;
+    try {
+      await client.getDirectoryAsync(node);
+    } catch {
+      /* may already be expanded */
+    }
+    log("INFO", `Ember fiber root resolved at path "${p}"`);
+    return p;
   }
+  return String(root);
+}
+
+async function nodeLabel(client, root, i) {
+  const paths = [`${root}.${i}`, `${root}/${i}`, `0.${root}.${i}`];
+  for (const p of paths) {
+    const node = await getNode(client, p);
+    const label = labelFromNode(node);
+    if (label) return label;
+    const param = await readParameter(client, p);
+    if (param != null) return String(param);
+  }
+  return null;
+}
+
+/** Find SR index by reading trunk 1 sync param (997.n.2100). */
+async function discoverByTrunkProbe(client, root) {
+  for (let i = 1; i <= 20; i++) {
+    for (const p of pathVariants(root, i, 2100)) {
+      const v = await readParameter(client, p);
+      if (v != null) {
+        log("INFO", `Stageracer trunk probe hit at ${p}`);
+        return i;
+      }
+    }
+  }
+  return null;
+}
+
+function walkTree(node, depth = 0, maxDepth = 6, results = []) {
+  if (!node || depth > maxDepth) return results;
+  const label = labelFromNode(node);
+  const nodePath =
+    typeof node.getPath === "function"
+      ? node.getPath()
+      : node.path ?? node.contents?.path ?? null;
+  if (label || nodePath) {
+    results.push({ path: nodePath, label: label || "(no label)" });
+  }
+  const kids = node.children ?? node.contents?.children ?? [];
+  for (const ch of kids) {
+    walkTree(ch, depth + 1, maxDepth, results);
+  }
+  return results;
 }
 
 async function discoverSrIndex(client, root, nameMatch) {
@@ -114,6 +190,18 @@ async function discoverSrIndex(client, root, nameMatch) {
       return i;
     }
   }
+
+  const probed = await discoverByTrunkProbe(client, root);
+  if (probed != null) {
+    log("INFO", `Using Stageracer index ${probed} (trunk 2100 readable, name match skipped)`);
+    return probed;
+  }
+
+  if (candidates.length === 1) {
+    log("INFO", `Only one child under ${root}, using index ${candidates[0].i} (${candidates[0].label})`);
+    return candidates[0].i;
+  }
+
   if (candidates.length) {
     log(
       "WARN",
@@ -121,7 +209,26 @@ async function discoverSrIndex(client, root, nameMatch) {
         candidates.map((c) => `${c.i}="${c.label}"`).join(", ")
     );
   } else {
-    log("WARN", `No children under Ember path ${root} (expected e.g. ${root}/1, ${root}/2, …)`);
+    const treeRoot = client.root ?? client.tree;
+    if (treeRoot) {
+      try {
+        await client.getDirectoryAsync(treeRoot);
+      } catch {
+        /* ignore */
+      }
+      const sample = walkTree(treeRoot, 0, 4).slice(0, 40);
+      if (sample.length) {
+        log(
+          "WARN",
+          `No children at ${root}. Sample Ember tree (use Ember+ Viewer or set ember.fiber_root): ` +
+            sample.map((n) => `${n.path || "?"}="${n.label}"`).join("; ")
+        );
+      } else {
+        log("WARN", `No children under Ember path ${root} (tried ${root}.1, ${root}/1, …)`);
+      }
+    } else {
+      log("WARN", `No children under Ember path ${root} (tried ${root}.1, ${root}/1, …)`);
+    }
   }
   return null;
 }
@@ -188,14 +295,15 @@ async function pollOnce(cfg) {
 
   try {
     await client.getDirectoryAsync();
-    const srIndex = await discoverSrIndex(client, root, nameMatch);
+    const fiberRoot = await expandFiberRoot(client, root);
+    const srIndex = await discoverSrIndex(client, fiberRoot, nameMatch);
     if (!srIndex) {
       log("WARN", `No device matching "${nameMatch}" under Ember path ${root} on ${connectedHost}`);
       const state = {
         online: false,
         host: connectedHost,
         name: null,
-        message: `No Stageracer matching "${nameMatch}" under ${root}`,
+        message: `No Stageracer matching "${nameMatch}" under ${fiberRoot}`,
         trunks: [],
         updatedAt: new Date().toISOString(),
       };
@@ -204,17 +312,13 @@ async function pollOnce(cfg) {
       return;
     }
 
-    const srName = await readParameter(client, `${root}/${srIndex}`);
+    const srName = await nodeLabel(client, fiberRoot, srIndex);
     const trunks = [];
 
     for (const t of trunkSuffixes()) {
-      const syncPath = emberPath(root, srIndex, t.sync);
-      const errPath = emberPath(root, srIndex, t.lastError);
-      const pwrPath = emberPath(root, srIndex, t.power);
-
-      const syncRaw = await readParameter(client, syncPath);
-      const errRaw = await readParameter(client, errPath);
-      const pwrRaw = await readParameter(client, pwrPath);
+      const syncRaw = await readParameter(client, pathVariants(fiberRoot, srIndex, t.sync));
+      const errRaw = await readParameter(client, pathVariants(fiberRoot, srIndex, t.lastError));
+      const pwrRaw = await readParameter(client, pathVariants(fiberRoot, srIndex, t.power));
 
       if (syncRaw == null && errRaw == null && pwrRaw == null) {
         continue;
