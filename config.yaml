@@ -1,4 +1,4 @@
-# Reference only — live config is config.yaml in the repo root.
+# Flypack config — edit here, commit, redeploy stack on Portainer.
 
 snmp:
   community: public

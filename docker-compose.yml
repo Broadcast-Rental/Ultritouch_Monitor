@@ -1,17 +1,12 @@
-# Portainer: deploy via Git "Repository" (full clone). Do not use Web editor only.
-# Set ULTRITOUCH_CONFIG / ULTRITOUCH_DATA to host paths where config.yaml lives.
 services:
   ultritouch-monitor:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
     network_mode: host
     volumes:
-      - ${ULTRITOUCH_CONFIG:-./config.yaml}:/app/config.yaml:ro
-      - ${ULTRITOUCH_DATA:-./data}:/app/data
+      - ./config.yaml:/app/config.yaml:ro
+      - ./data:/app/data
     environment:
       - SNMP_COMMUNITY=${SNMP_COMMUNITY:-public}
       - CONFIG_PATH=/app/config.yaml
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     restart: unless-stopped
-    # Kiosk: http://<host>:8080/
