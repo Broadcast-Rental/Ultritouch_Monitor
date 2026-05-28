@@ -1,12 +1,18 @@
+# Build always clones from GitHub (works when Portainer only has this file, not a full checkout).
+# After editing config.yaml on GitHub: Pull and redeploy to rebuild.
 services:
   ultritouch-monitor:
-    build: .
+    build:
+      context: https://github.com/Broadcast-Rental/Ultritouch_Monitor.git#main
+      dockerfile: Dockerfile
     network_mode: host
     volumes:
-      - ./config.yaml:/app/config.yaml:ro
-      - ./data:/app/data
+      - ultritouch-data:/app/data
     environment:
       - SNMP_COMMUNITY=${SNMP_COMMUNITY:-public}
       - CONFIG_PATH=/app/config.yaml
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     restart: unless-stopped
+
+volumes:
+  ultritouch-data:

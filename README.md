@@ -7,14 +7,14 @@ Everything lives in this repo — including [`config.yaml`](config.yaml). Edit c
 ## Portainer
 
 1. **Stacks** → **Add stack**
-2. **Repository**
-   - URL: `https://github.com/Broadcast-Rental/Ultritouch_Monitor`
-   - Branch: `main`
-   - Compose path: `docker-compose.yml`
-3. **Deploy the stack** (builds on first run; use **Pull and redeploy** after git pushes)
-4. Kiosk: `http://<server-ip>:8080/`
+2. Either:
+   - **Repository:** `https://github.com/Broadcast-Rental/Ultritouch_Monitor`, branch `main`, compose `docker-compose.yml`, or
+   - **Web editor:** paste [docker-compose.yml](docker-compose.yml) from the repo
+3. **Deploy** — Docker clones GitHub and builds (no Dockerfile needed on the Portainer host folder)
+4. After you change `config.yaml` on GitHub: **Pull and redeploy** (rebuild picks up new config)
+5. Kiosk: `http://<server-ip>:8080/`
 
-Use **Repository**, not a raw compose URL — Portainer needs the full repo (Dockerfile + `config.yaml`).
+If the repo is **private**, add Git credentials in Portainer or make the repo public (the compose build pulls from GitHub).
 
 ## SSH (same idea)
 

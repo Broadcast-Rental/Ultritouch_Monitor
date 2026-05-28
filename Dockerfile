@@ -18,7 +18,7 @@ COPY src ./src
 COPY web ./web
 COPY ember ./ember
 COPY --from=ember_deps /app/ember/node_modules ./ember/node_modules
-COPY config.example.yaml ./config.example.yaml
+COPY config.yaml ./config.yaml
 
 RUN mkdir -p /app/data
 
